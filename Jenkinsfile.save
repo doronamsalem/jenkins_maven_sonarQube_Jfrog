@@ -1,0 +1,50 @@
+pipeline
+{
+  // * Project plugins:
+  // * SonarQube Scanner
+  agent { label 'agent2!!!' }
+  environment { 
+    ARTIF_TOKEN = credentials('Calculator_artifactory') 
+    CI = true       // disable interactive prompt
+  }
+  tools {
+    maven 'maven 3.8.6'
+  }
+
+  stages {
+    stage('build && SonarQube analysis') {
+        steps {
+            withSonarQubeEnv(installationName: 'sonar_qube') {
+                sh 'mvn package sonar:sonar'
+            }
+        }
+    }
+
+     stage("Quality gate") {
+         steps {
+              waitForQualityGate abortPipeline: true
+         }
+     }
+
+    stage('Deliver to artifactory') {
+        steps {
+		sh 'jf rt upload --url http://44.200.83.230:8082/artifactory/calculator --access-token ${ARTIF_TOKEN} target/Calculator-1.0-SNAPSHOT.jar calculator_app/'  
+        }
+    }
+  }
+    post {
+            success {
+                emailext to: "doronamsalem100@yahoo.com",
+                subject: "Pipeline status",
+                body: "${currentBuild.fullDisplayName} completed successfully."
+             }
+
+            failure {
+                emailext to: "doronamsalem100@yahoo.com",
+                subject: "Pipeline status",
+                body: "${currentBuild.fullDisplayName} FAILED."
+            }
+    }
+}
+
+
